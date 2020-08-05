@@ -12,6 +12,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import pandas as pd
+import json
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -23,7 +24,7 @@ colors = {
     "text": "#000000"
 }
 
-app.layout = html.Div(children=[
+app.layout = html.Div([
     html.H1(children='Astronomer Dashboard (ADASH)',style={
             'textAlign': 'center',
         }),
@@ -31,13 +32,13 @@ app.layout = html.Div(children=[
         id='upload-data',
         children=html.Div([
             'Drag and Drop or ',
-            html.A('Select Files'),' of the form x,y,z'
+            html.A('Select Files')
         ]),
         style={
             'width': '20%',
             'height': '50px',
             'lineHeight': '60px',
-            'borderWidth': '1px',
+            'borderWidth': '10px',
             'borderStyle': 'dashed',
             'borderRadius': '1px',
             'textAlign': 'center',
@@ -47,17 +48,23 @@ app.layout = html.Div(children=[
         # Allow multiple files to be uploaded
         multiple=True
     ),
-    html.Div(["Period: ",dcc.Input(id='my-input-period', value='1.0', type='number')]),
-    html.Div(["T0: ",dcc.Input(id='my-input-t0', value='0.0', type='number')]),
-    html.Div(["Best Period: ",dcc.Input(id='my-input-bf', value='0.0', type='number')]),
-    html.Div(id='my-output-period'),
-    html.Div(id='my-output-t0'),
-    html.Div(id='my-output-bf'),
+    html.Div(["Period: ",dcc.Input(id='my-input-period', value='1.0', type='number', style={'width': '30%', 'display': 'inline-block'})]),
+    html.Div(["T0: ",dcc.Input(id='my-input-t0', value='0.0', type='number',style={'width': '25%', 'display': 'inline-block'})]),
+    html.Div(["Best Period: ",dcc.Input(id='my-input-bf', value='0.0', type='number',style={'width': '25%', 'display': 'inline-block'})]),
+#    html.Div(id='my-output-period',style={'display': 'none'}),
+    html.Div(id='my-output-t0',style={'display': 'none'}),
+    html.Div(id='my-output-period',style={'display': 'none'}),
+    html.Div(id='hidden-value', style={'display': 'none'}),
+    html.Hr(),
+    html.Hr(),
     html.Div(dcc.Graph(id='Mygraph'),style={'width': '33%', 'display': 'inline-block'}),
     html.Div(dcc.Graph(id='LombScargle'),style={'width': '33%', 'display': 'inline-block'}),
     html.Div(dcc.Graph(id='Mygraph2'),style={'width': '33%', 'display': 'inline-block'}),
+    html.Div(html.Div(id='my-output-bf',style={'position': 'absolute','left': '45%','bottom': '50%'})),
+    html.Hr(),
+    html.Hr(),
     html.Div(id='output-data-upload',style={'width': '33%', 'display': 'inline-block'}),
-    html.Div(id='output-data-phase-fold',style={'width': '33%', 'display': 'inline-block'})
+    html.Div(id='output-data-phase-fold',style={'width': '33%', 'display': 'inline-block'}),
 ])
 
 def parse_data(contents, filename):
@@ -68,7 +75,7 @@ def parse_data(contents, filename):
             # Assume that the user uploaded a CSV or TXT file
             df = pd.read_csv(
                 io.StringIO(decoded.decode('utf-8')))
-        elif 'xls' in filename:
+        elif 'xlsx' in filename:
             # Assume that the user uploaded an excel file
             df = pd.read_excel(io.BytesIO(decoded))
         elif 'txt' or 'tsv' in filename:
@@ -96,15 +103,6 @@ def update_output_div(input_value):
 @app.callback(
     Output(component_id='my-output-t0', component_property='children'),
     [Input(component_id='my-input-t0', component_property='value')]
-)
-def update_output_div(input_value):
-    if input_value == None:
-        input_value = 0.0
-    return 'Output: {}'.format(input_value)
-
-@app.callback(
-    Output(component_id='my-output-bf', component_property='children'),
-    [Input(component_id='my-input-bf', component_property='value')]
 )
 def update_output_div(input_value):
     if input_value == None:
@@ -158,8 +156,8 @@ def update_graph(contents, filename):
                 Input('my-input-t0', 'value'),
                 Input('my-input-period', 'value'),
             ])
-def update_graph(contents, filename,tnot,period):
-    x = [];y = [];xx = [];yy = [];xxx = [];yyy = [];frequency=[];power=[];bf=0
+def update_graph(contents, filename, tnot, period):
+    x = [];y = [];frequency=[];power=[]
     if contents:
         contents = contents[0]
         filename = filename[0]
@@ -173,7 +171,7 @@ def update_graph(contents, filename,tnot,period):
         t_days = x * u.day
         y_mags = y * u.mag
         dy_mags = yerr * u.mag
-        frequency, power = LombScargle(t_days, y_mags, dy_mags).autopower(nyquist_factor=5)
+        frequency, power = LombScargle(t_days, y_mags, dy_mags).autopower(nyquist_factor=10)
         bf = 1.0/frequency[np.argmax(power)]
     fig = go.Figure(
         data=[
@@ -198,15 +196,18 @@ def update_graph(contents, filename,tnot,period):
                 Input('upload-data', 'contents'),
                 Input('upload-data', 'filename'),
                 Input('my-input-t0', 'value'),
-                Input('my-input-period', 'value')
+                Input('my-input-period', 'value'),
+                Input('my-output-bf', 'children')
             ])
-def update_graph(contents, filename, tnot, period):
-    x = [];y = [];xx = [];yy = [];xxx = [];yyy = [];xstack=[];ystack=[]
+def update_graph(contents, filename, tnot, period, bf):
+    xstack=[];ystack=[]
     if contents:
         contents = contents[0]
         filename = filename[0]
+        bbf = bf.split(' ')
+        per = float(bbf[2])
         try:
-            period   = float(period)
+            period   = float(per)
         except:
             period   = 1.0
         try:
@@ -243,6 +244,32 @@ def update_graph(contents, filename, tnot, period):
     return fig
 
 
+@app.callback([
+                Output('hidden-value', 'children'),
+                Output('my-output-bf', 'children'),
+            ],
+            [
+                Input('upload-data', 'contents'),
+                Input('upload-data', 'filename'),
+            ])
+def update_hidden(contents, filename):
+    x = [];y = [];xx = [];yy = [];xxx = [];yyy = [];frequency=[];power=[];bf=1.0
+    if contents:
+        contents = contents[0]
+        filename = filename[0]
+        df = parse_data(contents, filename)
+        x    = df[df.columns[0]]
+        x = np.asarray(x)
+        y    = df[df.columns[1]]
+        y = np.asarray(y)
+        yerr = df[df.columns[2]]
+        yerr = np.asarray(yerr)
+        t_days = x * u.day
+        y_mags = y * u.mag
+        dy_mags = yerr * u.mag
+        frequency, power = LombScargle(t_days, y_mags, dy_mags).autopower(nyquist_factor=10)
+        bf = 1.0/frequency[np.argmax(power)]
+    return "Best Period: "+str(bf),"Best Period: "+str(bf)
 
 
 ###Table Callbacks
@@ -324,12 +351,6 @@ def update_table(contents, filename, tnot, period):
                         'width': '1%','textAlign':'left'},
                                         ]
             ),
-#            html.Hr(),
-#            html.Div('Raw Content'),
-##            html.Pre(contents[0:200] + '...', style={
-#                'whiteSpace': 'pre-wrap',
-#                'wordBreak': 'break-all'
-#            })
         ])
 
     return table
