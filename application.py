@@ -18,6 +18,12 @@ import numpy as np
 import dash_core_components as dcc
 import dash_table
 import json
+import matplotlib.pyplot as plt
+from astropy.io import fits
+import photutils
+from photutils import *
+import sys
+import math
 import app_builders as ab
 
 warnings.filterwarnings("ignore")
@@ -40,6 +46,7 @@ app.layout = html.Div(
             # Main Control Area
             ab.lc_collapsible_div(ab.lc_build_control_area(), "Light Curve Generator"),
             ab.bs_collapsible_div(ab.bs_build_control_area(), "Brigh Star Catalogue Generator"),
+            ab.zz_collapsible_div(ab.zz_build_control_area(), "Future App Generator"),
 
             # Main Display Area
             #ab.build_main_content_page(),
@@ -395,6 +402,38 @@ def update_table(contents, filename, tnot, period):
 
     return table
 
+#Reading in the fits file for PNC_DATA
+@app.callback(Output('output-read-fits-file', 'children'),
+            [
+                Input('bs_upload-data', 'contents'),
+                Input('bs_upload-data', 'filename'),
+            ])
+def read_fits_file(contents, filename):
+    #which extension is the Sci extension?
+    sciext = 0;xs = [];ys = []
+    #Input the .fits file from the command line -> python PNC_DATA.py <path to .fits file> <X>
+#    df = ab.parse_data(contents, filename, sciext)
+    scidata1 = 'No'
+    print(filename)
+    if contents:
+        fitsfile = filename[0]
+        print(fitsfile)
+    #print out header extension info if key is set to X
+        hdulist = fits.open(fitsfile,ignore_missing_end=True)
+        print (hdulist.info())
+    #spot check for the correct Sci Ext
+        try:
+            scidata = fits.getdata(fitsfile,ext=sciext,ignore_missing_end=True)
+            scidata1 = 'Yes'
+        except:
+            print ('')
+            print ('*ERROR! USE CORRECT SCIENCE EXTENSION*')
+            print ('TRY "'"python PNC_DATA.py <.fits file> X"'" ON THE COMMAND LINE '\
+                'FOR EXTENSION INFO.')
+            print ('')
+            scidata1 = 'None'
+    return scidata1
+
 # Building collapsible div
 @app.callback(
     Output("lc_collapse", "is_open"),
@@ -410,6 +449,16 @@ def toggle_collapse(n, is_open):
     Output("bs_collapse", "is_open"),
     [Input("bs_collapse-button", "n_clicks")],
     [State("bs_collapse", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+@app.callback(
+    Output("zz_collapse", "is_open"),
+    [Input("zz_collapse-button", "n_clicks")],
+    [State("zz_collapse", "is_open")],
 )
 def toggle_collapse(n, is_open):
     if n:

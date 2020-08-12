@@ -5,6 +5,7 @@ import dash_table
 import pandas as pd
 import base64
 import io
+from astropy.io import fits
 
 # Constants
 project_title = 'Astronomer Dashboard (ADASH)'
@@ -161,7 +162,8 @@ def bs_build_control_area():
                 ]),
         dbc.Col(id='nav-bar-col6',
                 style={**main_div_style, **{'marginLeft': 100}},
-                children=[html.H5(["Hello"]),]),
+                children=[html.H5(["Hello"]),
+                        html.Div(id='output-read-fits-file'),]),
     ])
 
 def bs_build_upload_area():
@@ -184,8 +186,74 @@ def bs_build_upload_area():
 
 
 ############# End BS Section #####################################################
+##################################################################
+##################################################################
+##################################################################
+############# ZZ Section #####################################################
 
-def parse_data(contents, filename):
+def zz_collapsible_div(my_div, title_div):
+    return html.Div(
+        style=main_div_style,
+        children=[
+            html.Br([]),
+            dbc.Col(
+                children=[
+                    dbc.Button(
+                        children=[
+                            html.H5(
+                                children=[title_div + ' + ']
+                            )],
+                        id="zz_collapse-button",
+                        className="mb-3",
+                        color="info",
+                    )]),
+            dbc.Collapse(id="zz_collapse",
+                         children=[
+                             my_div,
+                         ]),
+        ])
+
+
+def zz_build_control_area():
+    return dbc.Row(children=[
+        dbc.Col(id='nav-bar-colzz1',
+                style={**main_div_style,
+                       },
+                children=[
+                    html.H5(["Upload Files"]),
+                    zz_build_upload_area(),
+                    html.Br([]),
+                    dbc.Row(
+                        children=[]
+                    ),
+                ]),
+        dbc.Col(id='nav-bar-colzz2',
+                style={**main_div_style, **{'marginLeft': 100}},
+                children=[html.H5(["Hello"]),]),
+    ])
+
+def zz_build_upload_area():
+    return dcc.Upload(id='zz_upload-data', multiple=True,
+                      style={
+                          'width': '100%',
+                          'lineHeight': '60px',
+                          'borderWidth': '1px',
+                          'borderStyle': 'dashed',
+                          'borderRadius': '5px',
+                          'textAlign': 'center',
+                      },
+                      children=html.Div([
+                          'Drag and Drop or ',
+                          html.A('Select Files')
+                      ])
+                      )
+
+
+
+
+############# End ZZ Section #####################################################
+
+def parse_data(contents, filename, sciext=0):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     try:
@@ -200,6 +268,8 @@ def parse_data(contents, filename):
             # Assume that the user upl, delimiter = r'\s+'oaded an excel file
             df = pd.read_csv(
                 io.StringIO(decoded.decode('utf-8')), delimiter = r'\s+')
+#        elif 'fits' in filename:
+#            df = fits.getdata(fitsfile,ext=sciext,ignore_missing_end=True)
     except Exception as e:
         print(e)
         return html.Div([
